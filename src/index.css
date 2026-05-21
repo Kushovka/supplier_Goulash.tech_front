@@ -4,30 +4,64 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  font-family: "Montserrat", sans-serif;
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    font-family: "Montserrat", system-ui, sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(20, 83, 45, 0.10), transparent 32rem),
+      linear-gradient(180deg, #fbfaf7 0%, #f3f0e8 100%);
+    color: #1c1917;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
 }
 
-html {
-  background: #f5f7fb;
+@layer components {
+  .premium-shell {
+    @apply border border-stone-200/80 bg-white/90 shadow-[0_18px_60px_rgba(28,25,23,0.08)] backdrop-blur;
+  }
+
+  .premium-card {
+    @apply rounded-lg border border-stone-200/80 bg-white shadow-[0_16px_48px_rgba(28,25,23,0.07)] transition duration-300;
+  }
+
+  .premium-card-hover {
+    @apply hover:-translate-y-0.5 hover:border-emerald-800/25 hover:shadow-[0_24px_70px_rgba(20,83,45,0.14)];
+  }
+
+  .premium-button {
+    @apply inline-flex items-center justify-center rounded-md bg-emerald-950 px-5 py-3 font-semibold text-white shadow-[0_12px_28px_rgba(6,78,59,0.20)] transition hover:bg-emerald-900 hover:shadow-[0_16px_34px_rgba(6,78,59,0.24)];
+  }
+
+  .premium-button-gold {
+    @apply inline-flex items-center justify-center rounded-md bg-lime-400 px-5 py-3 font-extrabold text-stone-950 shadow-[0_14px_30px_rgba(132,204,22,0.22)] transition hover:bg-lime-300;
+  }
+
+  .premium-input {
+    @apply mt-2 w-full rounded-md border border-stone-300/90 bg-white/95 px-3 py-3 font-medium text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-emerald-800 focus:ring-4 focus:ring-emerald-900/10;
+  }
+
+  .premium-kicker {
+    @apply text-xs font-bold uppercase tracking-[0.22em] text-emerald-900;
+  }
+
+  .premium-divider {
+    @apply border-stone-200/80;
+  }
 }
 
-body {
-  min-width: 320px;
-  margin: 0;
-  background:
-    radial-gradient(circle at top left, rgba(34, 211, 238, 0.14), transparent 34rem),
-    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
-  color: #18181b;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-}
