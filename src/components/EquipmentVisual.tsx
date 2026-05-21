@@ -7,7 +7,7 @@ type EquipmentVisualProps = {
   title: string
   category: string
   className?: string
-}
+} 
 
 const categoryTone: Record<string, string> = {
   Tractors: 'from-emerald-950 via-emerald-800 to-lime-700',
