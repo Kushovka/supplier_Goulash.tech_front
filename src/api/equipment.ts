@@ -13,6 +13,7 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8001',
   headers: {
     Accept: 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
 })
 
