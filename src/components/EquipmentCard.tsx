@@ -25,17 +25,17 @@ const EquipmentCard = ({ item }: EquipmentCardProps) => (
       />
     </span>
     <div className="flex flex-1 flex-col p-6">
-      <div className="flex min-h-24 items-start justify-between gap-5">
+      <div className="flex min-h-24 flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between 2xl:gap-5">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
             {item.condition} / {item.category}
           </p>
-          <h3 className="mt-2 line-clamp-2 text-xl font-bold leading-snug text-stone-950">{item.title}</h3>
+          <h3 className="mt-2 line-clamp-2 text-2xl font-bold leading-snug text-stone-950 xl:text-xl 2xl:text-2xl">{item.title}</h3>
         </div>
-        <p className="shrink-0 pt-6 text-right text-lg font-extrabold text-emerald-900">{formatPrice(item.price)}</p>
+        <p className="shrink-0 text-left text-xl font-extrabold text-emerald-900 2xl:pt-6 2xl:text-right">{formatPrice(item.price)}</p>
       </div>
       <p className="mt-5 min-h-12 line-clamp-2 text-sm leading-6 text-stone-600">{item.short_description}</p>
-      <div className="mt-5 grid grid-cols-3 gap-3 text-xs font-semibold text-stone-600">
+      <div className="mt-5 grid grid-cols-2 gap-3 text-xs font-semibold text-stone-600 2xl:grid-cols-3">
         <span className="flex items-center gap-1.5">
           <FaRegCalendar className="text-emerald-800" /> {item.year}
         </span>

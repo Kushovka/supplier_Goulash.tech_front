@@ -167,7 +167,7 @@ const CatalogPage = () => {
           )}
           {!loading && (
             <motion.div
-              className="grid gap-6 md:grid-cols-2 xl:grid-cols-3"
+              className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]"
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}

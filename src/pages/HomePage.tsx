@@ -245,7 +245,7 @@ const EquipmentCarousel = ({ activeSlide, items, onNext, onPrevious, onSelect }:
 }
 
 const FeaturedListing = ({ item }: { item: Equipment }) => (
-  <article className="premium-card grid h-auto max-h-[360px] min-h-[320px] w-full overflow-hidden md:h-[360px] md:grid-cols-[minmax(400px,1.05fr)_minmax(380px,.95fr)]">
+  <article className="premium-card grid h-auto max-h-[650px] min-h-[320px] w-full overflow-hidden md:h-[360px] md:grid-cols-[minmax(400px,1.05fr)_minmax(380px,.95fr)]">
     <Link to={`/equipment/${item.slug}`} className="block h-56 overflow-hidden md:h-full">
       <EquipmentVisual
         image={item.images[0]}
