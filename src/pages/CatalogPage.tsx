@@ -1,257 +1,281 @@
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
-import { FaChevronLeft, FaChevronRight, FaFilter, FaRotateLeft } from 'react-icons/fa6'
-import { getApiErrorMessage, getEquipment, getEquipmentFilters } from '../api/equipment'
-import EquipmentCard from '../components/EquipmentCard'
-import { PageFade, Reveal } from '../components/motion'
-import { EquipmentCardSkeleton } from '../components/Skeleton'
-import type { Equipment, EquipmentFilters, EquipmentQuery } from '../types/equipment'
-import { formatPrice } from '../utils/format'
+import { useEffect, useMemo, useState } from 'react';
+import { FiAlertCircle, FiRefreshCw, FiSearch } from 'react-icons/fi';
+import { analyzeSupplier, fetchSupplierFilters, fetchSuppliers } from '../api/suppliers';
+import ComparisonModal from '../components/ComparisonModal';
+import Metric from '../components/Metric';
+import SelectField from '../components/SelectField';
+import StatusLine from '../components/StatusLine';
+import SupplierCard from '../components/SupplierCard';
+import type {
+  SearchFilters,
+  SupplierFilterOptions,
+  SupplierResult,
+} from '../types/equipment';
 
-type CatalogForm = {
-  category: string
-  brand: string
-  year: string
-  condition: string
-  price_min: string
-  price_max: string
-}
+const initialFilters: SearchFilters = {
+  query: '',
+  category: 'Все',
+  city: 'Все',
+  minVolumeKg: 0,
+  certificatesOnly: false,
+};
 
-const emptyQuery: CatalogForm = {
-  category: '',
-  brand: '',
-  year: '',
-  condition: '',
-  price_min: '',
-  price_max: '',
-}
-
-const pageSize = 12
+const initialFilterOptions: SupplierFilterOptions = {
+  categories: [],
+  cities: [],
+  volumesKg: [0, 50, 100, 150, 200],
+};
 
 const CatalogPage = () => {
-  const [items, setItems] = useState<Equipment[]>([])
-  const [filters, setFilters] = useState<EquipmentFilters | null>(null)
-  const [query, setQuery] = useState<CatalogForm>(emptyQuery)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const catalogTopRef = useRef<HTMLDivElement | null>(null)
+  const [filters, setFilters] = useState<SearchFilters>(initialFilters);
+  const [filterOptions, setFilterOptions] =
+    useState<SupplierFilterOptions>(initialFilterOptions);
+  const [results, setResults] = useState<SupplierResult[]>([]);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [analyzingIds, setAnalyzingIds] = useState<number[]>([]);
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    getEquipmentFilters().then(setFilters).catch(() => setFilters(null))
-  }, [])
+    let isActive = true;
+
+    const loadFilterOptions = async () => {
+      try {
+        const options = await fetchSupplierFilters();
+
+        if (isActive) {
+          setFilterOptions(options);
+        }
+      } catch {
+        if (isActive) {
+          setError('Backend недоступен. Проверьте, что API запущен на порту 8001.');
+        }
+      }
+    };
+
+    void loadFilterOptions();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
-    const params = toApiQuery(query, page)
+    let isActive = true;
 
-    getEquipment(params)
-      .then((data) => {
-        setItems(data.items)
-        setTotal(data.total)
-        setError(null)
-      })
-      .catch((requestError: unknown) => {
-        setItems([])
-        setTotal(0)
-        setError(getApiErrorMessage(requestError, 'Could not load equipment from backend.'))
-      })
-      .finally(() => setLoading(false))
-  }, [page, query])
+    const loadSuppliers = async () => {
+      setIsLoading(true);
+      setError('');
+      setAnalyzingIds([]);
 
-  const activeCount = useMemo(
-    () => Object.values(query).filter((value) => value !== undefined && value !== '').length,
-    [query],
-  )
+      try {
+        const apiResults = await fetchSuppliers(filters);
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+        if (isActive) {
+          setResults(apiResults);
+        }
+      } catch {
+        if (isActive) {
+          setResults([]);
+          setError('Не удалось загрузить поставщиков с backend.');
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    };
 
-  const update = (field: keyof CatalogForm) => (event: ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
-    setLoading(true)
-    setPage(1)
-    setQuery((current) => ({ ...current, [field]: event.target.value }))
-  }
+    void loadSuppliers();
 
-  const scrollToCatalogTop = () => {
-    catalogTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
+    return () => {
+      isActive = false;
+    };
+  }, [filters]);
+
+  const selectedSuppliers = useMemo(
+    () =>
+      selectedIds
+        .map((id) => results.find((result) => result.supplier.id === id))
+        .filter((result): result is SupplierResult => Boolean(result)),
+    [results, selectedIds],
+  );
+
+  const toggleSupplier = (supplierId: number) => {
+    setSelectedIds((current) =>
+      current.includes(supplierId)
+        ? current.filter((id) => id !== supplierId)
+        : [...current, supplierId],
+    );
+  };
+
+  const runAiAnalysis = async (supplierId: number) => {
+    setAnalyzingIds((current) => [...current, supplierId]);
+
+    try {
+      const response = await analyzeSupplier(supplierId, filters);
+
+      setResults((current) =>
+        current.map((result) =>
+          result.supplier.id === response.supplierId
+            ? { ...result, aiComment: response.aiComment }
+            : result,
+        ),
+      );
+    } catch {
+      setResults((current) =>
+        current.map((result) =>
+          result.supplier.id === supplierId
+            ? {
+                ...result,
+                aiComment:
+                  'Не удалось провести AI-анализ. Проверьте backend и Ollama.',
+              }
+            : result,
+        ),
+      );
+    } finally {
+      setAnalyzingIds((current) => current.filter((id) => id !== supplierId));
+    }
+  };
 
   return (
-    <PageFade>
-    <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <div className="premium-shell rounded-xl p-7">
-      <div className="flex flex-col justify-between gap-5 border-b border-stone-200/80 pb-7 md:flex-row md:items-end">
-        <div>
-          <p className="premium-kicker">Equipment Inventory</p>
-          <h1 className="mt-3 text-4xl font-extrabold text-stone-950">Farm machinery catalog</h1>
-          <p className="mt-3 max-w-2xl leading-7 text-stone-600">
-            Filter by machine type, brand, year, condition, and price range. Every listing is wired to the live backend inventory.
-          </p>
-        </div>
-        <div className="rounded-md border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold text-stone-700 shadow-sm">
-          {total} machines found
-        </div>
-      </div>
-
-      <div ref={catalogTopRef} className="mt-8 grid scroll-mt-28 gap-7 lg:grid-cols-[320px_1fr]">
-        <Reveal>
-        <aside className="premium-card h-fit p-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-xl font-extrabold text-stone-950">
-              <FaFilter className="text-emerald-800" /> Filters
-            </h2>
-            {activeCount > 0 && (
-              <button
-                type="button"
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-bold text-emerald-900 hover:bg-emerald-50"
-                onClick={() => {
-                  setLoading(true)
-                  setPage(1)
-                  setQuery(emptyQuery)
-                }}
-              >
-                <FaRotateLeft /> Reset
-              </button>
-            )}
-          </div>
-
-          <div className="mt-5 grid gap-4">
-            <FilterSelect label="Category" value={query.category} onChange={update('category')} options={filters?.categories ?? []} />
-            <FilterSelect label="Brand" value={query.brand} onChange={update('brand')} options={filters?.brands ?? []} />
-            <FilterSelect label="Year" value={query.year} onChange={update('year')} options={(filters?.years ?? []).map(String)} />
-            <FilterSelect label="Condition" value={query.condition} onChange={update('condition')} options={filters?.conditions ?? []} />
-            <label className="block text-sm font-bold text-stone-700">
-              Min Price
-              <input
-                type="number"
-                min="0"
-                value={query.price_min}
-                onChange={update('price_min')}
-                placeholder={filters?.price_min ? formatPrice(filters.price_min) : '$0'}
-                className="premium-input"
-              />
-            </label>
-            <label className="block text-sm font-bold text-stone-700">
-              Max Price
-              <input
-                type="number"
-                min="0"
-                value={query.price_max}
-                onChange={update('price_max')}
-                placeholder={filters?.price_max ? formatPrice(filters.price_max) : '$500,000'}
-                className="premium-input"
-              />
-            </label>
-          </div>
-        </aside>
-        </Reveal>
-
-        <div>
-          {loading && (
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <EquipmentCardSkeleton key={index} />
-              ))}
-            </div>
-          )}
-          {!loading && error && (
-            <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-5 font-bold text-red-800 shadow-sm">
-              {error}
-            </div>
-          )}
-          {!loading && items.length === 0 && (
-            <div className="premium-card p-8 text-center">
-              <h2 className="text-2xl font-extrabold text-stone-950">No machines found</h2>
-              <p className="mt-2 text-stone-600">Try another category, brand, or price range.</p>
-            </div>
-          )}
-          {!loading && (
-            <motion.div
-              className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]"
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            >
-              {items.map((item) => (
-                <EquipmentCard key={item.id} item={item} />
-              ))}
-            </motion.div>
-          )}
-          {!loading && totalPages > 1 && (
-            <div className="premium-card mt-8 flex flex-col items-center justify-between gap-4 p-4 sm:flex-row">
-              <p className="text-sm font-bold text-stone-600">
-                Page {page} of {totalPages}
+    <main className="min-h-screen bg-[#f6f7f2] text-zinc-950">
+      <section className="border-b border-zinc-200 bg-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                Внутренний сервис закупок
               </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  className="inline-flex items-center gap-2 rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40"
-                  onClick={() => {
-                    setLoading(true)
-                    scrollToCatalogTop()
-                    setPage((current) => Math.max(1, current - 1))
-                  }}
-                >
-                  <FaChevronLeft /> Previous
-                </button>
-                <button
-                  type="button"
-                  disabled={page >= totalPages}
-                  className="inline-flex items-center gap-2 rounded-md bg-emerald-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
-                  onClick={() => {
-                    setLoading(true)
-                    scrollToCatalogTop()
-                    setPage((current) => Math.min(totalPages, current + 1))
-                  }}
-                >
-                  Next <FaChevronRight />
-                </button>
-              </div>
+              <h1 className="mt-2 text-3xl font-bold tracking-normal sm:text-4xl">
+                Подбор поставщиков для ресторанов
+              </h1>
             </div>
-          )}
+            <div className="grid gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm sm:grid-cols-[1fr_auto]">
+              <Metric label="В выдаче" value={results.length.toString()} />
+              <button
+                className="relative h-12 rounded-md border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-950 hover:border-emerald-700"
+                onClick={() => setIsComparisonOpen(true)}
+                type="button"
+              >
+                Сравнение
+                {selectedSuppliers.length > 0 && (
+                  <span className="absolute -right-2 -top-2 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-emerald-700 px-1.5 text-xs font-bold text-white">
+                    {selectedSuppliers.length}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto]">
+            <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+              Что ищем
+              <span className="flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3">
+                <FiSearch className="h-4 w-4 text-zinc-500" />
+                <input
+                  className="h-11 w-full bg-transparent text-zinc-950 outline-none placeholder:text-zinc-400"
+                  placeholder="мясо, овощи, упаковка"
+                  value={filters.query}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, query: event.target.value }))
+                  }
+                />
+              </span>
+            </label>
+
+            <SelectField
+              label="Категория"
+              value={filters.category}
+              options={['Все', ...filterOptions.categories]}
+              onChange={(value) =>
+                setFilters((current) => ({
+                  ...current,
+                  category: value as SearchFilters['category'],
+                }))
+              }
+            />
+
+            <SelectField
+              label="Город"
+              value={filters.city}
+              options={['Все', ...filterOptions.cities]}
+              onChange={(value) => setFilters((current) => ({ ...current, city: value }))}
+            />
+
+            <SelectField
+              label="Минимальный объем"
+              value={filters.minVolumeKg.toString()}
+              options={filterOptions.volumesKg.map((value) => value.toString())}
+              onChange={(value) =>
+                setFilters((current) => ({ ...current, minVolumeKg: Number(value) }))
+              }
+              suffix="кг"
+              optionLabels={{ '0': 'Все' }}
+            />
+
+            <label className="flex min-h-[68px] items-end gap-2 text-sm font-medium text-zinc-700">
+              <input
+                type="checkbox"
+                className="mb-3 h-5 w-5 accent-emerald-700"
+                checked={filters.certificatesOnly}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    certificatesOnly: event.target.checked,
+                  }))
+                }
+              />
+              <span className="pb-3">Нужны сертификаты</span>
+            </label>
+          </div>
         </div>
-      </div>
-      </div>
-    </section>
-    </PageFade>
-  )
-}
+      </section>
 
-type FilterSelectProps = {
-  label: string
-  value?: string
-  options: string[]
-  onChange: (event: ChangeEvent<HTMLSelectElement>) => void
-}
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="grid gap-4">
+          {isLoading && (
+            <StatusLine icon={<FiRefreshCw className="h-4 w-4 animate-spin" />}>
+              Обновляем выдачу поставщиков
+            </StatusLine>
+          )}
 
-const FilterSelect = ({ label, value, options, onChange }: FilterSelectProps) => (
-  <label className="block text-sm font-bold text-stone-700">
-    {label}
-    <select
-      value={value}
-      onChange={onChange}
-      className="premium-input bg-white"
-    >
-      <option value="">All</option>
-      {options.map((option) => (
-        <option key={option} value={option}>
-          {option}
-        </option>
-      ))}
-    </select>
-  </label>
-)
+          {error && (
+            <StatusLine icon={<FiAlertCircle className="h-4 w-4" />}>{error}</StatusLine>
+          )}
 
-export default CatalogPage
+          {!isLoading && !error && results.length === 0 && (
+            <StatusLine icon={<FiSearch className="h-4 w-4" />}>
+              Поставщики по текущим фильтрам не найдены
+            </StatusLine>
+          )}
 
-const toApiQuery = (query: CatalogForm, page: number): EquipmentQuery => ({
-  page,
-  page_size: pageSize,
-  category: query.category || undefined,
-  brand: query.brand || undefined,
-  year: query.year ? Number(query.year) : undefined,
-  condition: query.condition || undefined,
-  price_min: query.price_min ? Number(query.price_min) : undefined,
-  price_max: query.price_max ? Number(query.price_max) : undefined,
-})
+          {results.map(({ supplier, score, aiComment }, index) => (
+            <SupplierCard
+              key={supplier.id}
+              aiComment={aiComment}
+              index={index}
+              isAnalyzing={analyzingIds.includes(supplier.id)}
+              isSelected={selectedIds.includes(supplier.id)}
+              score={score.value}
+              supplier={supplier}
+              onAnalyze={() => runAiAnalysis(supplier.id)}
+              onToggle={() => toggleSupplier(supplier.id)}
+            />
+          ))}
+        </div>
+      </section>
+
+      <ComparisonModal
+        isOpen={isComparisonOpen}
+        selectedSuppliers={selectedSuppliers}
+        onClear={() => setSelectedIds([])}
+        onClose={() => setIsComparisonOpen(false)}
+      />
+    </main>
+  );
+};
+
+export default CatalogPage;

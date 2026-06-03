@@ -1,71 +1,51 @@
-export type Equipment = {
-  slug: string
-  title: string
-  category: string
-  brand: string
-  model: string
-  year: number
-  condition: string
-  price: number
-  engine_hours: number | null
-  power_hp: number | null
-  location: string
-  short_description: string
-  images: string[]
-  features: string[]
-  id: string
-}
+export type SupplierCategory =
+  | 'Мясо'
+  | 'Овощи'
+  | 'Упаковка'
+  | 'Молочка'
+  | 'Бакалея';
 
-export type EquipmentDetail = Equipment & {
-  description: string
-  created_at: string
-}
+export type Supplier = {
+  id: number;
+  name: string;
+  category: SupplierCategory;
+  city: string;
+  region: string;
+  minOrderKg: number;
+  priceFromRub: number;
+  certificates: boolean;
+  delivery: 'По городу' | 'Межгород' | 'Самовывоз' | 'По городу и области';
+  phone: string;
+  website: string;
+  notes: string;
+};
 
-export type EquipmentListResponse = {
-  items: Equipment[]
-  total: number
-  page: number
-  page_size: number
-}
+export type SearchFilters = {
+  query: string;
+  category: 'Все' | SupplierCategory;
+  city: 'Все' | string;
+  minVolumeKg: number;
+  certificatesOnly: boolean;
+};
 
-export type EquipmentFilters = {
-  categories: string[]
-  brands: string[]
-  years: number[]
-  conditions: string[]
-  price_min: number | null
-  price_max: number | null
-}
+export type SupplierScore = {
+  value: number;
+  reasons: string[];
+};
 
-export type EquipmentQuery = {
-  page?: number
-  page_size?: number
-  category?: string
-  brand?: string
-  year?: number
-  condition?: string
-  price_min?: number
-  price_max?: number
-}
+export type SupplierResult = {
+  supplier: Supplier;
+  score: SupplierScore;
+  aiComment: string | null;
+};
 
-export type LeadPayload = {
-  equipment_id?: string | null
-  lead_type?: string
-  customer_name: string
-  phone: string
-  email?: string | null
-  message?: string | null
-}
+export type SupplierFilterOptions = {
+  categories: SupplierCategory[];
+  cities: string[];
+  volumesKg: number[];
+};
 
-export type LeadResponse = Required<LeadPayload> & {
-  id: string
-  created_at: string
-}
-
-export type ApiValidationError = {
-  detail?: Array<{
-    loc: Array<string | number>
-    msg: string
-    type: string
-  }>
-}
+export type SupplierAiResponse = {
+  supplierId: number;
+  aiComment: string;
+};

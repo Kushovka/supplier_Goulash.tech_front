@@ -1,9 +1,8 @@
-export const formatPrice = (price: number) =>
-  new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(price)
+export const formatKg = (value: number) => `${value} кг`;
 
-export const formatNumber = (value: number) =>
-  new Intl.NumberFormat('en-US').format(value)
+export const formatPrice = (value: number) =>
+  new Intl.NumberFormat('ru-RU', {
+    style: 'currency',
+    currency: 'RUB',
+    maximumFractionDigits: 0,
+  }).format(value);
